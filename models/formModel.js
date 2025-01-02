@@ -15,6 +15,7 @@ const formSchema = new mongoose.Schema({
   projectLink: { type: String, default: "" },
   projectNotes: { type: String, default: "" },
   proposedCost: { type: Number, default: 0 },
+  modifiedBy: { type: String, default: "" },
   proposalLink: { type: String, default: "" },
   proposalNotes: { type: String, default: "" },
   proposalStatus: { type: String, default: "" },
@@ -24,6 +25,8 @@ const formSchema = new mongoose.Schema({
   nextFollowUpDate: { type: Date, default: null },
   followUpNotes: { type: String, default: "" },
   internalNotes: { type: String, default: "" },
+  createdAt: { type: Date, required: true },
+  modifiedAt: { type: Date, required: true },
   assignedTo: { type: String, default: "" },
   tags: { type: [String], default: [] },
   priority: { type: String, default: "" },
@@ -32,8 +35,7 @@ const formSchema = new mongoose.Schema({
     {
       amount: { type: Number, required: true },
       date: { type: Date, required: true },
-      method: { type: String, required: true },
-      notes: { type: String, default: "" },
+      source: { type: String, required: true },
     },
   ],
 });
