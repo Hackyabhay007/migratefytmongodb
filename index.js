@@ -55,6 +55,57 @@ app.post("/api/forms", async (req, res) => {
 //     res.status(500).json({ error: error.message });
 //   }
 // });
+// app.get("/api/forms", async (req, res) => {
+//   try {
+//     // Extract query parameters for pagination, filters, and sorting
+//     const {
+//       page = 1,
+//       limit = 10,
+//       sortField = "createdAt",
+//       sortOrder = "desc",
+//       ...filters
+//     } = req.query;
+
+//     // Convert page and limit to integers
+//     const pageNum = parseInt(page, 10);
+//     const limitNum = parseInt(limit, 10);
+
+//     // Convert sorting order to numeric format for MongoDB
+//     const sortOrderNum = sortOrder === "asc" ? 1 : -1;
+
+//     // Apply filters (e.g., field=value)
+//     const query = {};
+//     for (const [key, value] of Object.entries(filters)) {
+//       query[key] = value;
+//     }
+
+//     // Calculate skip value for pagination
+//     const skip = (pageNum - 1) * limitNum;
+
+//     // Query the database with filters, pagination, and dynamic sorting
+//     const forms = await FormData.find(query)
+//       .skip(skip)
+//       .limit(limitNum)
+//       .sort({ [sortField]: sortOrderNum }); // Dynamic sorting
+
+//     // Get total count of documents for pagination metadata
+//     const total = await FormData.countDocuments(query);
+
+//     // Send response with data and pagination metadata
+//     res.status(200).json({
+//       total,
+//       page: pageNum,
+//       limit: limitNum,
+//       totalPages: Math.ceil(total / limitNum),
+//       data: forms,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+//new query
+
 app.get("/api/forms", async (req, res) => {
   try {
     // Extract query parameters for pagination, filters, and sorting
@@ -62,6 +113,7 @@ app.get("/api/forms", async (req, res) => {
       page = 1,
       limit = 10,
       sortField = "createdAt",
+      search = "",
       sortOrder = "desc",
       ...filters
     } = req.query;
@@ -73,23 +125,44 @@ app.get("/api/forms", async (req, res) => {
     // Convert sorting order to numeric format for MongoDB
     const sortOrderNum = sortOrder === "asc" ? 1 : -1;
 
-    // Apply filters (e.g., field=value)
+    // Build query to exclude objects with null values in requested filters and sortField
     const query = {};
+
+    // If search query is provided, add it to the query to search across fields
+    if (search) {
+      // Perform a case-insensitive search across multiple fields
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { company: { $regex: search, $options: "i" } },
+
+        // Add more fields if needed
+      ];
+    }
+    // Check for the sortField and add condition to exclude null values
+    if (sortField) {
+      query[sortField] = { $ne: null }; // Ensure sortField (nextFollowUpDate) is not null
+    }
+
+    // Apply other filters (e.g., field=value) if provided in the query
     for (const [key, value] of Object.entries(filters)) {
-      query[key] = value;
+      if (value !== "all" && value !== null) {
+        query[key] = value; // Exclude values of "all" or null
+      }
     }
 
     // Calculate skip value for pagination
     const skip = (pageNum - 1) * limitNum;
 
     // Query the database with filters, pagination, and dynamic sorting
-    const forms = await FormData.find(query)
-      .skip(skip)
-      .limit(limitNum)
-      .sort({ [sortField]: sortOrderNum }); // Dynamic sorting
-
-    // Get total count of documents for pagination metadata
-    const total = await FormData.countDocuments(query);
+    const [forms, total] = await Promise.all([
+      FormData.find(query)
+        .skip(skip)
+        .limit(limitNum)
+        .sort({ [sortField]: sortOrderNum })
+        .lean(),
+      FormData.countDocuments(query),
+    ]);
 
     // Send response with data and pagination metadata
     res.status(200).json({
