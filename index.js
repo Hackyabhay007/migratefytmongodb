@@ -47,14 +47,14 @@ app.post("/api/forms", async (req, res) => {
 });
 
 // Fetch all forms
-// app.get("/api/forms", async (req, res) => {
-//   try {
-//     const forms = await FormData.find();
-//     res.status(200).json(forms);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
+app.get("/api/forms/all_leads", async (req, res) => {
+  try {
+    const forms = await FormData.find();
+    res.status(200).json(forms);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // app.get("/api/forms", async (req, res) => {
 //   try {
 //     // Extract query parameters for pagination, filters, and sorting
@@ -105,6 +105,146 @@ app.post("/api/forms", async (req, res) => {
 // });
 
 //new query
+// queries for dashboard startfrom here
+
+// Utility Functions
+const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
+const endOfToday = new Date(new Date().setHours(23, 59, 59, 999));
+const startOfMonth = new Date(
+  new Date().getFullYear(),
+  new Date().getMonth(),
+  1
+);
+const endOfMonth = new Date(
+  new Date().getFullYear(),
+  new Date().getMonth() + 1,
+  0,
+  23,
+  59,
+  59,
+  999
+);
+
+// API Endpoints
+
+// Total count of objects
+app.get("/api/total-count", async (req, res) => {
+  try {
+    const count = await FormData.countDocuments({});
+    res.json({ totalCount: count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Conversion Ratio API
+app.get("/api/conversion-ratio", async (req, res) => {
+  try {
+    const totalLeads = await FormData.countDocuments();
+    const wonLeads = await FormData.countDocuments({ status: "won" });
+
+    if (totalLeads === 0) {
+      return res.json({ conversionRatio: 0 });
+    }
+
+    const conversionRatio = (wonLeads / totalLeads) * 100;
+    res.json({ conversionRatio: conversionRatio.toFixed(2) }); // Returning a percentage with 2 decimal points
+  } catch (error) {
+    console.error("Error calculating conversion ratio:", error.message);
+    res.status(500).json({ error: "Failed to calculate conversion ratio" });
+  }
+});
+// Today's leads
+app.get("/api/todays-leads", async (req, res) => {
+  try {
+    const leads = await FormData.find({
+      createdAt: { $gte: startOfToday, $lt: endOfToday },
+    });
+    res.json({ count: leads.length, leads });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// This month's leads
+app.get("/api/month-leads", async (req, res) => {
+  try {
+    const leads = await FormData.find({
+      createdAt: { $gte: startOfMonth, $lt: endOfMonth },
+    });
+    res.json({ count: leads.length, leads });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Total payment required
+app.get("/api/total-payment-required", async (req, res) => {
+  try {
+    const result = await FormData.aggregate([
+      { $match: { total_payment_required: { $ne: null } } }, // Exclude null values
+      {
+        $group: {
+          _id: null,
+          totalPaymentRequired: { $sum: "$total_payment_required" },
+        },
+      },
+    ]);
+    res.json({ totalPaymentRequired: result[0]?.totalPaymentRequired || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Total amount paid
+app.get("/api/total-paid", async (req, res) => {
+  try {
+    const result = await FormData.aggregate([
+      { $unwind: "$addedPayments" },
+      { $match: { "addedPayments.amount": { $ne: null } } }, // Exclude null values
+      { $group: { _id: null, totalPaid: { $sum: "$addedPayments.amount" } } },
+    ]);
+    res.json({ totalPaid: result[0]?.totalPaid || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remaining amount
+app.get("/api/remaining-amount", async (req, res) => {
+  try {
+    const result = await FormData.aggregate([
+      {
+        $project: {
+          totalPaymentRequired: { $ifNull: ["$total_payment_required", 0] },
+          totalPaid: {
+            $sum: {
+              $map: {
+                input: "$addedPayments",
+                as: "payment",
+                in: { $ifNull: ["$$payment.amount", 0] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          remaining: { $subtract: ["$totalPaymentRequired", "$totalPaid"] },
+        },
+      },
+    ]);
+    const totalRemaining = result.reduce(
+      (acc, item) => acc + item.remaining,
+      0
+    );
+    res.json({ totalRemaining });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+//queries for dashboard ends here
 
 app.get("/api/forms", async (req, res) => {
   try {
@@ -269,6 +409,107 @@ app.delete("/api/expenses/:id", async (req, res) => {
     res.status(200).json({ message: "Expense deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+//last 30days report
+app.get("/api/leads-last-30-days", async (req, res) => {
+  try {
+    const today = new Date();
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - 30);
+
+    const leads = await FormData.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate, $lte: today },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const formattedData = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      const formattedDate = date.toISOString().split("T")[0];
+
+      const lead = leads.find((lead) => lead._id === formattedDate);
+      return {
+        date: formattedDate,
+        count: lead ? lead.count : 0,
+      };
+    }).reverse();
+
+    res.json({
+      labels: formattedData.map((data) => {
+        const date = new Date(data.date);
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      }),
+      data: formattedData.map((data) => data.count),
+    });
+  } catch (error) {
+    console.error("Error fetching leads for last 30 days:", error.message);
+    res.status(500).json({ error: "Failed to fetch leads for last 30 days" });
+  }
+});
+
+// status for bargraph
+app.get("/api/leads-status-count", async (req, res) => {
+  try {
+    const statusCounts = await FormData.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    res.json({
+      labels: statusCounts.map((status) => status._id),
+      data: statusCounts.map((status) => status.count),
+    });
+  } catch (error) {
+    console.error("Error fetching status counts:", error.message);
+    res.status(500).json({ error: "Failed to fetch status counts" });
+  }
+});
+
+//DoughNut charts
+
+app.get("/api/leads-source-count", async (req, res) => {
+  try {
+    const leads = await FormData.find();
+    const sourceCounts = {};
+
+    leads.forEach((lead) => {
+      const source =
+        lead.source &&
+        (lead.source.startsWith("http") || lead.source.startsWith("www"))
+          ? "website"
+          : lead.source || "Unknown";
+
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    });
+
+    const labels = Object.keys(sourceCounts);
+    const data = Object.values(sourceCounts);
+
+    res.json({ labels, data });
+  } catch (error) {
+    console.error("Error fetching source data:", error.message);
+    res.status(500).json({ error: "Failed to fetch source data" });
   }
 });
 
