@@ -3,12 +3,6 @@ import dotenv from "dotenv";
 import connectDB from "./config/mongoDb.js";
 import FormData from "./models/formModel.js";
 import cors from "cors";
-// import {
-//   createExpense,
-//   getExpenseById,
-//   updateExpenseById,
-//   deleteExpenseById,
-// } from "./controllers/expenseApi.js";
 
 import {
   createExpense,
