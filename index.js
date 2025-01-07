@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/mongoDb.js";
 import FormData from "./models/formModel.js";
 import cors from "cors";
-
+import suggestionFormRoutes from "./routes/suggestionFormRoutes.js";
 import {
   createExpense,
   getExpenseById,
@@ -29,6 +29,9 @@ app.get("/", (req, res) => {
 
 // API Routes
 
+// Routes suggestion-forms
+app.use("/api/suggestion-forms", suggestionFormRoutes);
+
 // Create a new document
 app.post("/api/forms", async (req, res) => {
   try {
@@ -49,57 +52,6 @@ app.get("/api/forms/all_leads", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-// app.get("/api/forms", async (req, res) => {
-//   try {
-//     // Extract query parameters for pagination, filters, and sorting
-//     const {
-//       page = 1,
-//       limit = 10,
-//       sortField = "createdAt",
-//       sortOrder = "desc",
-//       ...filters
-//     } = req.query;
-
-//     // Convert page and limit to integers
-//     const pageNum = parseInt(page, 10);
-//     const limitNum = parseInt(limit, 10);
-
-//     // Convert sorting order to numeric format for MongoDB
-//     const sortOrderNum = sortOrder === "asc" ? 1 : -1;
-
-//     // Apply filters (e.g., field=value)
-//     const query = {};
-//     for (const [key, value] of Object.entries(filters)) {
-//       query[key] = value;
-//     }
-
-//     // Calculate skip value for pagination
-//     const skip = (pageNum - 1) * limitNum;
-
-//     // Query the database with filters, pagination, and dynamic sorting
-//     const forms = await FormData.find(query)
-//       .skip(skip)
-//       .limit(limitNum)
-//       .sort({ [sortField]: sortOrderNum }); // Dynamic sorting
-
-//     // Get total count of documents for pagination metadata
-//     const total = await FormData.countDocuments(query);
-
-//     // Send response with data and pagination metadata
-//     res.status(200).json({
-//       total,
-//       page: pageNum,
-//       limit: limitNum,
-//       totalPages: Math.ceil(total / limitNum),
-//       data: forms,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-//new query
-// queries for dashboard startfrom here
 
 // Utility Functions
 const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));

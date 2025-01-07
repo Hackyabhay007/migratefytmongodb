@@ -7,7 +7,8 @@ const formSchema = new mongoose.Schema(
     email: { type: String, required: false },
     phone: { type: String, required: true },
     company: { type: String, required: false },
-    budget: { type: String, required: false },
+    range_budget: { type: String, required: false },
+    budget: { type: Number, required: false },
     source: { type: String, default: "" },
     status: { type: String, default: "new" },
     projectStartDate: { type: Date, default: null },
@@ -44,6 +45,6 @@ const formSchema = new mongoose.Schema(
 );
 
 // Create the model
-const FormData = mongoose.model("FormData", formSchema);
+const FormData = mongoose.model("FormData", formSchema, "leadsdata");
 
 export default FormData;
